@@ -1,0 +1,1908 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>STUNLOCKED Server Hub — Real P2P v3.0</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --bg-card: #151a28;
+            --bg-card-hover: #1a2135;
+            --primary: #00ff88;
+            --primary-glow: rgba(0, 255, 136, 0.4);
+            --danger: #ff4757;
+            --info: #3742fa;
+            --warning: #ffa502;
+            --text-main: #f1f2f6;
+            --text-muted: #a4b0be;
+            --border: rgba(255, 255, 255, 0.08);
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(circle at 20% 80%, rgba(0, 255, 136, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(55, 66, 250, 0.03) 0%, transparent 50%);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ═══════════ HEADER ═══════════ */
+        header {
+            background: rgba(21, 26, 40, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), #00cc6a);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        header h1 {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            background: linear-gradient(90deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-sub {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        .net-status {
+            margin-left: auto;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: #2f3640;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+
+        .net-status::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .net-status.online {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--primary);
+            border-color: rgba(0, 255, 136, 0.2);
+        }
+
+        .net-status.online::before {
+            box-shadow: 0 0 8px var(--primary);
+            animation: pulse 2s infinite;
+        }
+
+        .net-status.connecting {
+            background: rgba(255, 165, 2, 0.1);
+            color: var(--warning);
+            border-color: rgba(255, 165, 2, 0.2);
+        }
+
+        .net-status.connecting::before {
+            animation: pulse 0.8s infinite;
+        }
+
+        .net-status.error {
+            background: rgba(255, 71, 87, 0.1);
+            color: var(--danger);
+            border-color: rgba(255, 71, 87, 0.2);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.5; }
+        }
+
+        /* ═══════════ SCROLLBAR ═══════════ */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2f3640; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f4650; }
+
+        /* ═══════════ SERVER LIST ═══════════ */
+        #server-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            padding-bottom: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 52px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* ═══════════ SERVER CARD ═══════════ */
+        .server-card {
+            background: var(--bg-card);
+            border-radius: 14px;
+            padding: 18px;
+            border: 1px solid var(--border);
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .server-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateY(-1px);
+        }
+
+        .server-card.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.12), var(--shadow);
+        }
+
+        .server-card.active::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), transparent);
+            border-radius: 14px 14px 0 0;
+        }
+
+        .srv-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .srv-title-wrap {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .srv-title {
+            font-size: 17px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .srv-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .srv-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .srv-badge {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 5px 12px;
+            border-radius: 20px;
+            background: #2f3640;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+            margin-left: 10px;
+        }
+
+        .server-card.active .srv-badge {
+            background: rgba(0, 255, 136, 0.12);
+            color: var(--primary);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+
+        .srv-idc-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .srv-idc-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .srv-idc {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--warning);
+            letter-spacing: 1px;
+            user-select: all;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .srv-idc:hover {
+            color: #ffc048;
+        }
+
+        .idc-copy-btn {
+            background: rgba(255, 165, 2, 0.1);
+            border: 1px solid rgba(255, 165, 2, 0.2);
+            color: var(--warning);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .idc-copy-btn:hover {
+            background: rgba(255, 165, 2, 0.2);
+        }
+
+        .srv-stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 14px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 10px 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .stat-value.danger { color: var(--danger); }
+        .stat-value.warning { color: var(--warning); }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ═══════════ PLAYER LIST ═══════════ */
+        .player-list {
+            margin-bottom: 14px;
+        }
+
+        .player-list-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-size: 12px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .player-item:hover {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .player-item.host {
+            border-color: rgba(255, 165, 2, 0.2);
+            background: rgba(255, 165, 2, 0.05);
+        }
+
+        .player-name {
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .host-crown {
+            font-size: 12px;
+        }
+
+        .player-ping {
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .player-ping.good { color: var(--primary); background: rgba(0, 255, 136, 0.1); }
+        .player-ping.medium { color: var(--warning); background: rgba(255, 165, 2, 0.1); }
+        .player-ping.bad { color: var(--danger); background: rgba(255, 71, 87, 0.1); }
+
+        /* ═══════════ BUTTONS ═══════════ */
+        .btn-group {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 11px 8px;
+            border: none;
+            border-radius: 9px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #fff;
+            min-width: 75px;
+            letter-spacing: 0.3px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s;
+        }
+
+        .btn:hover::after {
+            transform: translateX(100%);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+
+        .btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .btn svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+
+        .btn-start { background: #2f3640; }
+        .btn-start:hover:not(:disabled) { background: #3f4650; }
+        .server-card.active .btn-start { background: var(--danger); }
+        .server-card.active .btn-start:hover { background: #ff6b7a; }
+
+        .btn-join { background: var(--primary); color: var(--bg-dark); }
+        .btn-join:hover:not(:disabled) { background: #00e67a; }
+
+        .btn-ai { background: var(--info); }
+        .btn-ai:hover:not(:disabled) { background: #4a54ff; }
+
+        .btn-idc { background: var(--warning); color: #1a1a1a; }
+        .btn-idc:hover:not(:disabled) { background: #ffb52e; }
+
+        .btn-delete {
+            background: transparent;
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            color: var(--danger);
+            flex: 0.15;
+            min-width: 42px;
+        }
+
+        .btn-delete:hover:not(:disabled) {
+            background: rgba(255, 71, 87, 0.1);
+            border-color: var(--danger);
+        }
+
+        /* ═══════════ FAB ═══════════ */
+        .fab {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 62px;
+            height: 62px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #00cc6a);
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 6px 25px var(--primary-glow), 0 3px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s;
+        }
+
+        .fab svg {
+            width: 28px;
+            height: 28px;
+            fill: var(--bg-dark);
+        }
+
+        .fab:hover {
+            transform: scale(1.08);
+            box-shadow: 0 8px 30px var(--primary-glow), 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .fab:active {
+            transform: scale(0.92) rotate(45deg);
+        }
+
+        /* ═══════════ MODAL ═══════════ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(11, 15, 25, 0.94);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            padding: 20px;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            display: flex;
+        }
+
+        .modal-box {
+            background: var(--bg-card);
+            width: 100%;
+            max-width: 400px;
+            padding: 28px;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            transform: translateY(25px) scale(0.97);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-height: 88vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .modal-overlay.show .modal-box {
+            transform: translateY(0) scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .modal-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .modal-icon.create { background: rgba(0, 255, 136, 0.1); }
+        .modal-icon.join { background: rgba(55, 66, 250, 0.1); }
+
+        .modal-box h3 {
+            font-size: 19px;
+            font-weight: 800;
+        }
+
+        .modal-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 7px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 13px 14px;
+            border-radius: 10px;
+            border: 1px solid #2f3640;
+            background: rgba(0, 0, 0, 0.25);
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.2s;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .input-group select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23a4b0be' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 40px;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+        }
+
+        .input-group input::placeholder {
+            color: #4a5568;
+        }
+
+        .input-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 28px;
+        }
+
+        .btn-text {
+            background: transparent;
+            color: var(--text-muted);
+            padding: 11px 18px;
+            border: none;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 9px;
+            transition: all 0.2s;
+        }
+
+        .btn-text:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--bg-dark);
+            padding: 11px 24px;
+            border: none;
+            border-radius: 9px;
+            font-weight: 800;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary:hover {
+            background: #00e67a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+        }
+
+        /* ═══════════ TOAST ═══════════ */
+        .toast {
+            position: fixed;
+            top: -70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #000;
+            padding: 13px 24px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 13px;
+            z-index: 2000;
+            transition: top 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: 90vw;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toast.show {
+            top: 25px;
+        }
+
+        .toast.error {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .toast.error .toast-icon {
+            fill: #fff !important;
+        }
+
+        .toast.warning {
+            background: var(--warning);
+            color: #1a1a1a;
+        }
+
+        .toast-icon {
+            width: 18px;
+            height: 18px;
+            fill: var(--primary);
+            flex-shrink: 0;
+        }
+
+        /* ═══════════ RESPONSIVE ═══════════ */
+        @media (max-width: 480px) {
+            header h1 { font-size: 15px; }
+            .header-sub { display: none; }
+            .srv-stats { gap: 8px; }
+            .stat-value { font-size: 17px; }
+            .btn { font-size: 10px; padding: 10px 6px; min-width: 65px; }
+            .fab { bottom: 22px; right: 22px; width: 56px; height: 56px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ═══════════ HEADER ═══════════ -->
+    <header>
+        <div class="logo-icon">🖥️</div>
+        <div>
+            <h1>STN SERVER HUB</h1>
+            <div class="header-sub">P2P Sunucu Yönetim Paneli v3.0</div>
+        </div>
+        <div class="net-status" id="net-status">Hazır</div>
+    </header>
+
+    <!-- ═══════════ SERVER LIST ═══════════ -->
+    <div id="server-list"></div>
+
+    <!-- ═══════════ FAB ═══════════ -->
+    <button class="fab" onclick="openModal()" title="Yeni Sunucu">
+        <svg viewBox="0 0 24 24"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2z"/></svg>
+    </button>
+
+    <!-- ═══════════ CREATE MODAL ═══════════ -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-icon create">🖥️</div>
+                <div>
+                    <h3>Yeni Sunucu Kur</h3>
+                    <div class="modal-subtitle">P2P ağında yeni oda oluştur</div>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Sunucu Adı</label>
+                <input type="text" id="s-name" placeholder="Örn: Ölüm Maçı Lobi 1" maxlength="30" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label>Max Oyuncu Sayısı</label>
+                <input type="number" id="s-cap" value="100" min="2" max="1000">
+                <div class="input-hint">💡 2-1000 arası, fazlası performansı düşürür</div>
+            </div>
+            <div class="input-group">
+                <label>Sunucu Modu</label>
+                <select id="s-mode">
+                    <option value="game">🎮 Oyun Sunucusu</option>
+                    <option value="chat">💬 Sohbet Odası</option>
+                    <option value="file">📁 Dosya Paylaşımı</option>
+                    <option value="custom">⚙️ Özel Protokol</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Tick Rate (Veri Hızı)</label>
+                <select id="s-tick">
+                    <option value="20">20 Hz — Düşük veri, genel kullanım</option>
+                    <option value="30" selected>30 Hz — Dengeli (Önerilen)</option>
+                    <option value="60">60 Hz — Yüksek hassasiyet, FPS oyunları</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-text" onclick="closeModal()">İPTAL</button>
+                <button class="btn-primary" onclick="createServer()">
+                    OLUŞTUR
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 12h3v8h6v-6h2v6h6v-8h3L12 2z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ JOIN MODAL ═══════════ -->
+    <div class="modal-overlay" id="join-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-icon join">🔌</div>
+                <div>
+                    <h3>Sunucuya Bağlan</h3>
+                    <div class="modal-subtitle">IDC kodu ile herhangi bir sunucuya katıl</div>
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Sunucu IDC Kodu</label>
+                <input type="text" id="j-idc" placeholder="STN-IDC-XXXXXX" maxlength="13"
+                    style="text-transform:uppercase; font-family:monospace; letter-spacing:1px;"
+                    autocomplete="off" spellcheck="false">
+                <div class="input-hint">💡 IDC'yi sunucu sahibinden almalısın</div>
+            </div>
+            <div class="input-group">
+                <label>Oyuncu Adın</label>
+                <input type="text" id="j-name" placeholder="Örn: ProGamer42" maxlength="20" autocomplete="off">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-text" onclick="closeJoinModal()">İPTAL</button>
+                <button class="btn-primary" onclick="joinServer()">
+                    BAĞLAN
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ TOAST ═══════════ -->
+    <div class="toast" id="toast">
+        <svg class="toast-icon" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+        <span id="toast-msg">İşlem başarılı</span>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════
+        //   STN SERVER HUB — Real P2P Engine
+        //   PeerJS + WebRTC ile gerçek sunucu altyapısı
+        // ═══════════════════════════════════════════════════════════════
+
+        'use strict';
+
+        // ─── Sabitler ───
+        const STORAGE_KEY     = 'STN_Servers_V3';
+        const PEER_PREFIX     = 'stn-hub-';
+        const RECONNECT_MS    = 3000;
+        const HEARTBEAT_MS    = 4000;
+        const PING_INTERVAL   = 2000;
+        const MAX_RETRIES     = 10;
+
+        // ─── Durum ───
+        let servers        = [];
+        let peers          = {};   // idc → Peer (host modu)
+        let connections    = {};   // idc → { peerId: DataConnection }
+        let playerPings    = {};   // idc → { peerId: ms }
+        let heartbeatTimers= {};   // idc → interval
+        let retryCounts    = {};   // idc → number
+
+        // Client modu
+        let clientPeer     = null;
+        let clientConn     = null;
+        let clientTarget   = null;
+        let myPlayerName   = 'Oyuncu';
+        let clientPing     = 0;
+        let clientRetry    = 0;
+        let clientPingTimer= null;
+        let clientReconTimer=null;
+
+        // ═══════════════════════════════════════════════════════════════
+        //   YARDIMCI FONKSİYONLAR
+        // ═══════════════════════════════════════════════════════════════
+
+        function generateIDC() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return 'STN-IDC-' + code;
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(servers));
+            } catch (e) {
+                console.error('Kayıt hatası:', e);
+            }
+        }
+
+        function loadData() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                servers = raw ? JSON.parse(raw) : [];
+                // Eski aktif sunucuları temizle (sayfa yenilenince bağlantı kopar)
+                servers.forEach(s => {
+                    s.isActive = false;
+                    s.currentPlayers = 0;
+                    s.players = {};
+                });
+                saveData();
+            } catch (e) {
+                servers = [];
+            }
+        }
+
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            const icon = t.querySelector('.toast-icon');
+            document.getElementById('toast-msg').innerText = msg;
+
+            t.className = 'toast';
+            if (type === 'error')   t.classList.add('error');
+            if (type === 'warning') t.classList.add('warning');
+
+            icon.style.fill = type === 'success' ? '#00ff88'
+                            : type === 'error'   ? '#fff'
+                            : '#1a1a1a';
+
+            t.classList.add('show');
+            clearTimeout(t._timer);
+            t._timer = setTimeout(() => t.classList.remove('show'), 3200);
+        }
+
+        function setNetStatus(status, text) {
+            const el = document.getElementById('net-status');
+            el.className = 'net-status ' + status;
+            el.textContent = text;
+        }
+
+        function getServer(idc) {
+            return servers.find(s => s.idc === idc) || null;
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        }
+
+        function peerIdFromIDC(idc) {
+            return PEER_PREFIX + idc.replace(/-/g, '').toLowerCase();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   MODAL YÖNETİMİ
+        // ═══════════════════════════════════════════════════════════════
+
+        function openModal() {
+            const m = document.getElementById('modal');
+            m.style.display = 'flex';
+            requestAnimationFrame(() => m.classList.add('show'));
+            setTimeout(() => document.getElementById('s-name').focus(), 350);
+        }
+
+        function closeModal() {
+            const m = document.getElementById('modal');
+            m.classList.remove('show');
+            setTimeout(() => {
+                m.style.display = 'none';
+                document.getElementById('s-name').value = '';
+            }, 320);
+        }
+
+        function openJoinModal(idc) {
+            const m = document.getElementById('join-modal');
+            if (idc) document.getElementById('j-idc').value = idc;
+            m.style.display = 'flex';
+            requestAnimationFrame(() => m.classList.add('show'));
+            setTimeout(() => {
+                const el = idc ? document.getElementById('j-name') : document.getElementById('j-idc');
+                el.focus();
+            }, 350);
+        }
+
+        function closeJoinModal() {
+            const m = document.getElementById('join-modal');
+            m.classList.remove('show');
+            setTimeout(() => { m.style.display = 'none'; }, 320);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   SUNUCU OLUŞTURMA
+        // ═══════════════════════════════════════════════════════════════
+
+        function createServer() {
+            const nameEl = document.getElementById('s-name');
+            const name   = nameEl.value.trim() || 'Bilinmeyen Sunucu';
+            let cap      = parseInt(document.getElementById('s-cap').value, 10) || 100;
+            const mode   = document.getElementById('s-mode').value;
+            const tick   = parseInt(document.getElementById('s-tick').value, 10) || 30;
+
+            if (cap < 2)  cap = 2;
+            if (cap > 1000) cap = 1000;
+
+            const srv = {
+                idc:           generateIDC(),
+                name:          name.substring(0, 30),
+                capacity:      cap,
+                currentPlayers: 0,
+                isActive:      false,
+                mode:          mode,
+                tickRate:      tick,
+                createdAt:     Date.now(),
+                players:       {}
+            };
+
+            servers.unshift(srv);
+            saveData();
+            renderList();
+            closeModal();
+            showToast('✅ Sunucu oluşturuldu! BAŞLAT ile aktif et.');
+        }
+
+        function deleteServer(idc) {
+            const srv = getServer(idc);
+            if (!srv) return;
+
+            if (srv.isActive) {
+                stopServer(idc, true);
+            }
+
+            servers = servers.filter(s => s.idc !== idc);
+            saveData();
+            renderList();
+            showToast('🗑️ Sunucu silindi.');
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   HOST MODU — SUNUCUYU BAŞLAT / DURDUR
+        // ═══════════════════════════════════════════════════════════════
+
+        function toggleServer(idc) {
+            const srv = getServer(idc);
+            if (!srv) return;
+
+            if (srv.isActive) {
+                stopServer(idc);
+                showToast('⏹️ Sunucu durduruldu.');
+            } else {
+                startServer(idc);
+            }
+        }
+
+        function startServer(idc) {
+            const srv = getServer(idc);
+            if (!srv || srv.isActive) return;
+
+            setNetStatus('connecting', 'BAĞLANIYOR...');
+            showToast('🔄 PeerJS ağına bağlanılıyor...');
+
+            const targetPeerId = peerIdFromIDC(idc);
+            retryCounts[idc] = 0;
+
+            const peer = new Peer(targetPeerId, {
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' }
+                    ]
+                }
+            });
+
+            peers[idc]       = peer;
+            connections[idc] = {};
+            playerPings[idc] = {};
+
+            // ─── Peer Açıldı ───
+            peer.on('open', (id) => {
+                console.log('[HOST] Peer açıldı:', id);
+
+                srv.isActive       = true;
+                srv.currentPlayers = 1;
+                srv.players        = {
+                    host: { name: '👑 Host', joinTime: Date.now(), isHost: true }
+                };
+
+                saveData();
+                renderList();
+                setNetStatus('online', 'AKTİF');
+                showToast('✅ Sunucu aktif! IDC: ' + idc);
+
+                // Heartbeat başlat
+                heartbeatTimers[idc] = setInterval(() => {
+                    broadcastToClients(idc, {
+                        type:      'heartbeat',
+                        players:   srv.currentPlayers,
+                        maxPlayers: srv.capacity,
+                        timestamp: Date.now()
+                    });
+                }, HEARTBEAT_MS);
+            });
+
+            // ─── Yeni Bağlantı ───
+            peer.on('connection', (conn) => {
+                console.log('[HOST] Bağlantı isteği:', conn.peer);
+
+                conn.on('open', () => {
+                    // Kapasite kontrolü
+                    if (srv.currentPlayers >= srv.capacity) {
+                        conn.send({ type: 'reject', reason: 'Sunucu dolu! (' + srv.capacity + ' kişi)' });
+                        setTimeout(() => { try { conn.close(); } catch(e){} }, 400);
+                        return;
+                    }
+
+                    // Bağlantıyı kaydet
+                    connections[idc][conn.peer] = conn;
+                    playerPings[idc][conn.peer] = 0;
+
+                    // Oyuncu ekle
+                    srv.currentPlayers++;
+                    srv.players[conn.peer] = {
+                        name:     'Oyuncu-' + conn.peer.slice(-4),
+                        joinTime: Date.now(),
+                        isHost:   false
+                    };
+
+                    saveData();
+                    renderList();
+
+                    // Yeni oyuncuya hoş geldin
+                    conn.send({
+                        type:       'welcome',
+                        idc:        idc,
+                        serverName: srv.name,
+                        yourId:     conn.peer,
+                        tickRate:   srv.tickRate,
+                        players:    Object.entries(srv.players).map(([pid, p]) => ({
+                            id:     pid,
+                            name:   p.name,
+                            isHost: p.isHost
+                        }))
+                    });
+
+                    // Diğerlerine duyur
+                    broadcastToClients(idc, {
+                        type:         'player-joined',
+                        playerId:     conn.peer,
+                        playerName:   srv.players[conn.peer].name,
+                        totalPlayers: srv.currentPlayers
+                    }, conn.peer);
+
+                    showToast('👤 Oyuncu katıldı! (' + srv.currentPlayers + '/' + srv.capacity + ')');
+                });
+
+                // ─── Veri Alındı ───
+                conn.on('data', (data) => {
+                    handleHostData(idc, conn.peer, data);
+                });
+
+                // ─── Bağlantı Kapandı ───
+                conn.on('close', () => {
+                    handlePlayerLeave(idc, conn.peer);
+                });
+
+                conn.on('error', (err) => {
+                    console.error('[HOST] Conn hatası:', err);
+                    handlePlayerLeave(idc, conn.peer);
+                });
+            });
+
+            // ─── Peer Kopması ───
+            peer.on('disconnected', () => {
+                console.log('[HOST] Peer disconnected, reconnecting...');
+                setNetStatus('connecting', 'YENİDEN BAĞLANIYOR...');
+                if (peer && !peer.destroyed) {
+                    peer.reconnect();
+                }
+            });
+
+            // ─── Peer Hatası ───
+            peer.on('error', (err) => {
+                console.error('[HOST] Peer hatası:', err.type, err);
+
+                if (err.type === 'unavailable-id') {
+                    showToast('❌ Bu IDC kullanımda! Silip yeniden oluştur.', 'error');
+                    stopServer(idc, true);
+                    setNetStatus('error', 'IDC DOLU');
+                }
+                else if (err.type === 'network' || err.type === 'server-error') {
+                    showToast('❌ Ağ hatası! İnterneti kontrol et.', 'error');
+                    stopServer(idc, true);
+                    setNetStatus('error', 'AĞ HATASI');
+                }
+                else if (err.type === 'browser-incompatible') {
+                    showToast('❌ Tarayıcın WebRTC desteklemiyor!', 'error');
+                    stopServer(idc, true);
+                    setNetStatus('error', 'DESTEK YOK');
+                }
+            });
+        }
+
+        function stopServer(idc, silent = false) {
+            const srv = getServer(idc);
+            if (!srv) return;
+
+            // Heartbeat durdur
+            if (heartbeatTimers[idc]) {
+                clearInterval(heartbeatTimers[idc]);
+                delete heartbeatTimers[idc];
+            }
+
+            // Tüm client'lara kapanış bildir
+            if (connections[idc]) {
+                Object.values(connections[idc]).forEach(conn => {
+                    try { conn.send({ type: 'server-closed' }); } catch(e){}
+                    setTimeout(() => { try { conn.close(); } catch(e){} }, 300);
+                });
+            }
+
+            // Peer yok et
+            if (peers[idc]) {
+                try { peers[idc].destroy(); } catch(e){}
+                delete peers[idc];
+            }
+
+            // Temizlik
+            delete connections[idc];
+            delete playerPings[idc];
+            delete retryCounts[idc];
+
+            srv.isActive       = false;
+            srv.currentPlayers = 0;
+            srv.players        = {};
+
+            saveData();
+            renderList();
+
+            if (!silent) {
+                const anyActive = servers.some(s => s.isActive);
+                if (!anyActive) setNetStatus('offline', 'Hazır');
+            }
+        }
+
+        function handlePlayerLeave(idc, playerId) {
+            const srv = getServer(idc);
+            if (!srv || !srv.players[playerId]) return;
+
+            const wasName = srv.players[playerId].name;
+            delete srv.players[playerId];
+            srv.currentPlayers = Math.max(1, srv.currentPlayers - 1);
+
+            if (connections[idc])  delete connections[idc][playerId];
+            if (playerPings[idc])  delete playerPings[idc][playerId];
+
+            broadcastToClients(idc, {
+                type:         'player-left',
+                playerId:     playerId,
+                playerName:   wasName,
+                totalPlayers: srv.currentPlayers
+            });
+
+            saveData();
+            renderList();
+        }
+
+        function handleHostData(idc, playerId, data) {
+            const srv = getServer(idc);
+            if (!srv) return;
+
+            switch (data.type) {
+
+                case 'set-name': {
+                    const newName = String(data.name || '').trim().substring(0, 20);
+                    if (newName && srv.players[playerId]) {
+                        srv.players[playerId].name = newName;
+                        broadcastToClients(idc, {
+                            type:    'player-renamed',
+                            playerId: playerId,
+                            newName:  newName
+                        });
+                        saveData();
+                        renderList();
+                    }
+                    break;
+                }
+
+                case 'ping': {
+                    // Client'tan ping → pong gönder
+                    const conn = connections[idc] && connections[idc][playerId];
+                    if (conn && conn.open) {
+                        conn.send({ type: 'pong', timestamp: data.timestamp });
+                    }
+                    break;
+                }
+
+                case 'pong': {
+                    // Client'ın pong'u → ping hesapla
+                    if (data.timestamp && playerPings[idc]) {
+                        playerPings[idc][playerId] = Date.now() - data.timestamp;
+                        updatePingUI(idc);
+                    }
+                    break;
+                }
+
+                case 'game-data': {
+                    // Oyun verisini diğerlerine ilet
+                    broadcastToClients(idc, {
+                        type:    'game-data',
+                        from:    playerId,
+                        payload: data.payload
+                    }, playerId);
+                    break;
+                }
+
+                case 'chat': {
+                    broadcastToClients(idc, {
+                        type:    'chat',
+                        from:    playerId,
+                        fromName: srv.players[playerId]?.name || 'Anonim',
+                        message: String(data.message || '').substring(0, 200)
+                    });
+                    break;
+                }
+            }
+        }
+
+        function broadcastToClients(idc, msg, excludePeerId = null) {
+            if (!connections[idc]) return;
+            Object.entries(connections[idc]).forEach(([pid, conn]) => {
+                if (pid !== excludePeerId && conn.open) {
+                    try { conn.send(msg); } catch(e){}
+                }
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   CLIENT MODU — SUNUCUYA BAĞLAN
+        // ═══════════════════════════════════════════════════════════════
+
+        function joinServer() {
+            const idcRaw = document.getElementById('j-idc').value.trim().toUpperCase();
+            const name   = document.getElementById('j-name').value.trim() || 'Oyuncu';
+
+            // IDC format kontrolü
+            if (!idcRaw || idcRaw.length < 6) {
+                showToast('❌ IDC kodu eksik!', 'error');
+                return;
+            }
+
+            // Normalize et
+            let idc = idcRaw;
+            if (!idc.startsWith('STN-IDC-')) {
+                if (idc.length === 6) {
+                    idc = 'STN-IDC-' + idc;
+                } else {
+                    showToast('❌ Geçersiz IDC! STN-IDC-XXXXXX formatında olmalı.', 'error');
+                    return;
+                }
+            }
+
+            myPlayerName = name.substring(0, 20);
+            clientTarget = idc;
+            clientRetry  = 0;
+
+            closeJoinModal();
+            setNetStatus('connecting', 'BAĞLANIYOR...');
+            showToast('🔄 "' + idc + '" sunucusuna bağlanılıyor...');
+
+            // Eski bağlantıyı temizle
+            disconnectClient(true);
+
+            const targetPeerId = peerIdFromIDC(idc);
+
+            clientPeer = new Peer({
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
+
+            clientPeer.on('open', () => {
+                console.log('[CLIENT] Peer açıldı, hedef:', targetPeerId);
+                attemptClientConnect(targetPeerId);
+            });
+
+            clientPeer.on('error', (err) => {
+                console.error('[CLIENT] Peer hatası:', err.type);
+
+                if (err.type === 'peer-unavailable') {
+                    showToast('❌ Sunucu bulunamadı! IDC\'yi kontrol et.', 'error');
+                    setNetStatus('error', 'BULUNAMADI');
+                    scheduleClientReconnect(targetPeerId);
+                }
+                else if (err.type === 'network' || err.type === 'server-error') {
+                    showToast('❌ Ağ hatası!', 'error');
+                    setNetStatus('error', 'AĞ HATASI');
+                    scheduleClientReconnect(targetPeerId);
+                }
+            });
+
+            clientPeer.on('disconnected', () => {
+                console.log('[CLIENT] Peer disconnected');
+                setNetStatus('connecting', 'YENİDEN BAĞLANIYOR...');
+                if (clientPeer && !clientPeer.destroyed) {
+                    clientPeer.reconnect();
+                }
+            });
+        }
+
+        function attemptClientConnect(targetPeerId) {
+            if (!clientPeer || clientPeer.destroyed) return;
+
+            console.log('[CLIENT] Bağlanma denemesi:', targetPeerId);
+
+            const conn = clientPeer.connect(targetPeerId, {
+                reliable: true,
+                metadata: { playerName: myPlayerName }
+            });
+
+            clientConn = conn;
+
+            conn.on('open', () => {
+                console.log('[CLIENT] Bağlantı açıldı!');
+                clientRetry = 0;
+                setNetStatus('online', 'BAĞLI');
+                showToast('✅ Sunucuya bağlandın!');
+
+                // İsim gönder
+                conn.send({ type: 'set-name', name: myPlayerName });
+
+                // Ping döngüsü
+                startClientPing(conn);
+            });
+
+            conn.on('data', (data) => {
+                handleClientData(data);
+            });
+
+            conn.on('close', () => {
+                console.log('[CLIENT] Bağlantı kapandı');
+                setNetStatus('connecting', 'KOPTU — YENİDEN...');
+                showToast('⚠️ Bağlantı koptu! Yeniden bağlanılıyor...', 'warning');
+                stopClientPing();
+                scheduleClientReconnect(targetPeerId);
+            });
+
+            conn.on('error', (err) => {
+                console.error('[CLIENT] Conn hatası:', err);
+            });
+        }
+
+        function scheduleClientReconnect(targetPeerId) {
+            if (clientRetry >= MAX_RETRIES) {
+                showToast('❌ Maksimum deneme sayısına ulaşıldı.', 'error');
+                setNetStatus('error', 'BAŞARISIZ');
+                disconnectClient();
+                return;
+            }
+
+            clientRetry++;
+            const delay = RECONNECT_MS * Math.min(clientRetry, 5); // Exponential backoff
+
+            console.log('[CLIENT] ' + (delay/1000) + 'sn sonra yeniden denenecek... (' + clientRetry + '/' + MAX_RETRIES + ')');
+
+            if (clientReconTimer) clearTimeout(clientReconTimer);
+            clientReconTimer = setTimeout(() => {
+                attemptClientConnect(targetPeerId);
+            }, delay);
+        }
+
+        function startClientPing(conn) {
+            stopClientPing();
+            clientPingTimer = setInterval(() => {
+                if (conn.open) {
+                    conn.send({ type: 'ping', timestamp: Date.now() });
+                }
+            }, PING_INTERVAL);
+        }
+
+        function stopClientPing() {
+            if (clientPingTimer) {
+                clearInterval(clientPingTimer);
+                clientPingTimer = null;
+            }
+        }
+
+        function handleClientData(data) {
+            switch (data.type) {
+
+                case 'welcome': {
+                    console.log('[CLIENT] Hoş geldin:', data);
+                    showToast('🎮 "' + data.serverName + '" sunucusuna katıldın!');
+                    break;
+                }
+
+                case 'heartbeat': {
+                    // Sunucu ayakta, bir şey yapma
+                    break;
+                }
+
+                case 'pong': {
+                    if (data.timestamp) {
+                        clientPing = Date.now() - data.timestamp;
+                        updateClientPingUI();
+                    }
+                    break;
+                }
+
+                case 'player-joined': {
+                    showToast('👤 ' + data.playerName + ' katıldı! (' + data.totalPlayers + ' oyuncu)');
+                    break;
+                }
+
+                case 'player-left': {
+                    showToast('👋 ' + (data.playerName || 'Bir oyuncu') + ' ayrıldı.');
+                    break;
+                }
+
+                case 'player-renamed': {
+                    console.log('[CLIENT] İsim değişti:', data.newName);
+                    break;
+                }
+
+                case 'game-data': {
+                    // Kendi oyun mantığın burada işlenir
+                    console.log('[GAME]', data.from, data.payload);
+                    break;
+                }
+
+                case 'chat': {
+                    console.log('[CHAT]', data.fromName + ':', data.message);
+                    break;
+                }
+
+                case 'server-closed': {
+                    showToast('🔴 Sunucu kapatıldı!', 'error');
+                    disconnectClient();
+                    break;
+                }
+
+                case 'reject': {
+                    showToast('❌ ' + (data.reason || 'Bağlantı reddedildi.'), 'error');
+                    disconnectClient();
+                    break;
+                }
+            }
+        }
+
+        function disconnectClient(silent = false) {
+            stopClientPing();
+
+            if (clientReconTimer) {
+                clearTimeout(clientReconTimer);
+                clientReconTimer = null;
+            }
+
+            if (clientConn) {
+                try { clientConn.close(); } catch(e){}
+                clientConn = null;
+            }
+
+            if (clientPeer) {
+                try { clientPeer.destroy(); } catch(e){}
+                clientPeer = null;
+            }
+
+            clientTarget = null;
+            clientPing   = 0;
+            clientRetry  = 0;
+
+            if (!silent) {
+                setNetStatus('offline', 'Hazır');
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   UI GÜNCELLEME
+        // ═══════════════════════════════════════════════════════════════
+
+        function updatePingUI(idc) {
+            // Host modunda ping değerlerini güncelle
+            if (!playerPings[idc]) return;
+            document.querySelectorAll('[data-ping-idc="' + idc + '"]').forEach(el => {
+                const pid = el.getAttribute('data-pid');
+                if (playerPings[idc][pid] !== undefined) {
+                    const ms = playerPings[idc][pid];
+                    el.textContent = ms + 'ms';
+                    el.className = 'player-ping ' + (ms < 80 ? 'good' : ms < 200 ? 'medium' : 'bad');
+                }
+            });
+        }
+
+        function updateClientPingUI() {
+            const el = document.getElementById('net-status');
+            if (el && el.classList.contains('online')) {
+                el.textContent = 'BAĞLI • ' + clientPing + 'ms';
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   RENDER — SUNUCU LİSTESİ
+        // ═══════════════════════════════════════════════════════════════
+
+        function renderList() {
+            const list = document.getElementById('server-list');
+            list.innerHTML = '';
+
+            if (servers.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🖥️</div>
+                        <div class="empty-title">Henüz Sunucu Yok</div>
+                        <div class="empty-desc">
+                            Sağ alttaki <b style="color:var(--primary)">+</b> butonuna basarak<br>
+                            ilk P2P sunucunu oluştur!
+                        </div>
+                    </div>`;
+                return;
+            }
+
+            const modeIcons = {
+                game:   '🎮',
+                chat:   '💬',
+                file:   '📁',
+                custom: '⚙️'
+            };
+
+            servers.forEach(srv => {
+                const card = document.createElement('div');
+                card.className = 'server-card' + (srv.isActive ? ' active' : '');
+
+                // ─── Oyuncu Listesi HTML ───
+                let playersHtml = '';
+                if (srv.isActive && Object.keys(srv.players).length > 0) {
+                    playersHtml = '<div class="player-list">';
+                    playersHtml += '<div class="player-list-title">👥 Bağlı Oyuncular (' + srv.currentPlayers + ')</div>';
+
+                    Object.entries(srv.players).forEach(([pid, p]) => {
+                        const isHost    = p.isHost;
+                        const pingVal   = !isHost && playerPings[srv.idc] && playerPings[srv.idc][pid] !== undefined
+                                        ? playerPings[srv.idc][pid] : null;
+                        const pingClass = pingVal === null ? '' : (pingVal < 80 ? 'good' : pingVal < 200 ? 'medium' : 'bad');
+                        const pingText  = isHost ? 'HOST' : (pingVal !== null ? pingVal + 'ms' : '—');
+
+                        playersHtml += `
+                            <div class="player-item ${isHost ? 'host' : ''}">
+                                <span class="player-name">
+                                    ${isHost ? '<span class="host-crown">👑</span>' : ''}
+                                    ${escapeHtml(p.name)}
+                                </span>
+                                ${!isHost ? `<span class="player-ping ${pingClass}"
+                                    data-ping-idc="${srv.idc}" data-pid="${pid}">${pingText}</span>` : ''}
+                            </div>`;
+                    });
+
+                    playersHtml += '</div>';
+                }
+
+                // ─── Buton İkonları ───
+                const startIcon = srv.isActive
+                    ? '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>'
+                    : '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+
+                const joinIcon  = '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>';
+                const aiIcon    = '<svg viewBox="0 0 24 24"><path d="M21 9V7c0-1.1-.9-2-2-2h-3v1c0 2.21-1.79 4-4 4S8 8.21 8 6V5H5c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v2c0 1.1.9 2 2 2h3v-1c0-2.21 1.79-4 4-4s4 1.79 4 4v1h3c1.1 0 2-.9 2-2v-2c1.66 0 3-1.34 3-3s-1.34-3-3-3zM7 11.5A1.5 1.5 0 115.5 10 1.5 1.5 0 017 11.5zm11 0a1.5 1.5 0 11-1.5-1.5 1.5 1.5 0 011.5 1.5z"/></svg>';
+                const delIcon   = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+
+                // ─── Kart HTML ───
+                card.innerHTML = `
+                    <div class="srv-header">
+                        <div class="srv-title-wrap">
+                            <div class="srv-title">${escapeHtml(srv.name)}</div>
+                            <div class="srv-meta">
+                                <span>${modeIcons[srv.mode] || '⚙️'} ${srv.mode}</span>
+                                <span>📶 ${srv.tickRate}Hz</span>
+                                <span>📅 ${new Date(srv.createdAt).toLocaleDateString('tr-TR')}</span>
+                            </div>
+                        </div>
+                        <div class="srv-badge">${srv.isActive ? '● AKTİF' : '○ KAPALI'}</div>
+                    </div>
+
+                    <div class="srv-idc-row">
+                        <span class="srv-idc-label">IDC</span>
+                        <span class="srv-idc" onclick="copyIDC('${srv.idc}')" title="Kopyalamak için tıkla">${srv.idc}</span>
+                        <button class="idc-copy-btn" onclick="copyIDC('${srv.idc}')">KOPYALA</button>
+                    </div>
+
+                    <div class="srv-stats">
+                        <div class="stat-box">
+                            <div class="stat-value ${srv.isActive ? '' : 'danger'}">${srv.isActive ? srv.currentPlayers : '—'}</div>
+                            <div class="stat-label">Oyuncu</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" style="color:var(--text-muted)">${srv.capacity}</div>
+                            <div class="stat-label">Max Kapasite</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value ${srv.isActive ? '' : 'warning'}" style="font-size:14px; padding-top:4px;">
+                                ${srv.isActive ? 'Çevrimiçi' : 'Çevrimdışı'}
+                            </div>
+                            <div class="stat-label">Durum</div>
+                        </div>
+                    </div>
+
+                    ${playersHtml}
+
+                    <div class="btn-group">
+                        <button class="btn btn-start" onclick="toggleServer('${srv.idc}')">
+                            ${startIcon} ${srv.isActive ? 'DURDUR' : 'BAŞLAT'}
+                        </button>
+                        <button class="btn btn-join" onclick="openJoinModal('${srv.idc}')">
+                            ${joinIcon} BAĞLAN
+                        </button>
+                        <button class="btn btn-ai" onclick="getAIPrompt('${srv.idc}', '${srv.name.replace(/'/g, "\\'")}')">
+                            ${aiIcon} AI
+                        </button>
+                        <button class="btn btn-delete" onclick="deleteServer('${srv.idc}')" title="Sunucuyu Sil">
+                            ${delIcon}
+                        </button>
+                    </div>
+                `;
+
+                list.appendChild(card);
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   KOPYALAMA & AI PROMPT
+        // ═══════════════════════════════════════════════════════════════
+
+        function copyIDC(idc) {
+            const doCopy = () => showToast('📋 IDC kopyalandı: ' + idc);
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(idc).then(doCopy).catch(() => fallbackCopy(idc, doCopy));
+            } else {
+                fallbackCopy(idc, doCopy);
+            }
+        }
+
+        function fallbackCopy(text, callback) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0;';
+            document.body.appendChild(ta);
+            ta.select();
+            ta.setSelectionRange(0, text.length);
+            try { document.execCommand('copy'); } catch(e){}
+            document.body.removeChild(ta);
+            callback();
+        }
+
+        function getAIPrompt(idc, name) {
+            const srv = getServer(idc);
+            const tickRate = srv ? srv.tickRate : 30;
+            const mode     = srv ? srv.mode     : 'game';
+
+            const prompt = [
+                'Sen bir WebRTC/PeerJS uzmanısın.',
+                'Aşağıdaki P2P sunucu için CLIENT tarafı kodu yaz.',
+                '',
+                'SUNUCU BİLGİLERİ:',
+                '- IDC: "' + idc + '"',
+                '- Ad: "' + name + '"',
+                '- Mod: ' + mode,
+                '- Tick Rate: ' + tickRate + 'Hz',
+                '',
+                'TEKNİK GEREKSİNİMLER:',
+                '1. PeerJS kullan (CDN: unpkg.com/peerjs@1.5.2)',
+                '2. Sunucu Peer ID: "' + peerIdFromIDC(idc) + '"',
+                '3. Bağlantı: reliable: true',
+                '4. Otomatik yeniden bağlanma (3sn, max 10 deneme, exponential backoff)',
+                '5. Ping-pong gecikme ölçümü (2sn aralıklarla)',
+                '6. Veri formatları:',
+                '   - { type:"set-name", name:"..." }',
+                '   - { type:"game-data", payload:{...} }',
+                '   - { type:"chat", message:"..." }',
+                '   - { type:"ping", timestamp:... }',
+                '',
+                'FONKSİYONLAR:',
+                '- connectToServer(idc, playerName)',
+                '- sendGameData(payload)',
+                '- sendChat(message)',
+                '- onGameData(callback)',
+                '- onPlayerJoin(callback)',
+                '- onPlayerLeave(callback)',
+                '- onChat(callback)',
+                '- getPing() → son ping değeri',
+                '- disconnect()',
+                '',
+                'Tam çalışan tek HTML dosyası olarak ver. Türkçe yorumlar ekle.'
+            ].join('\n');
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(prompt)
+                    .then(() => showToast('🤖 AI promptu kopyalandı!'))
+                    .catch(() => fallbackCopy(prompt, () => showToast('🤖 AI promptu kopyalandı!')));
+            } else {
+                fallbackCopy(prompt, () => showToast('🤖 AI promptu kopyalandı!'));
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //   GLOBAL FONKSİYONLARI HTML'E AÇ
+        // ═══════════════════════════════════════════════════════════════
+
+        window.openModal         = openModal;
+        window.closeModal        = closeModal;
+        window.openJoinModal     = openJoinModal;
+        window.closeJoinModal    = closeJoinModal;
+        window.createServer      = createServer;
+        window.deleteServer      = deleteServer;
+        window.toggleServer      = toggleServer;
+        window.joinServer        = joinServer;
+        window.copyIDC           = copyIDC;
+        window.getAIPrompt       = getAIPrompt;
+        window.disconnectClient  = disconnectClient;
+
+        // ═══════════════════════════════════════════════════════════════
+        //   BAŞLANGIÇ & TEMİZLİK
+        // ═══════════════════════════════════════════════════════════════
+
+        // ESC ile modalları kapat
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { closeModal(); closeJoinModal(); }
+        });
+
+        // Modal dışına tıklayınca kapat
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+        document.getElementById('join-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeJoinModal();
+        });
+
+        // Sayfa kapanırken temizlik
+        window.addEventListener('beforeunload', () => {
+            Object.keys(peers).forEach(idc => stopServer(idc, true));
+            disconnectClient(true);
+        });
+
+        // Sayfa görünmez olunca bağlantıları koru (mobil için)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Arkaplanda heartbeat'i yavaşlat
+                Object.keys(heartbeatTimers).forEach(idc => {
+                    clearInterval(heartbeatTimers[idc]);
+                    heartbeatTimers[idc] = setInterval(() => {
+                        const srv = getServer(idc);
+                        if (srv && srv.isActive) {
+                            broadcastToClients(idc, {
+                                type: 'heartbeat',
+                                players: srv.currentPlayers,
+                                timestamp: Date.now()
+                            });
+                        }
+                    }, HEARTBEAT_MS * 2);
+                });
+            }
+        });
+
+        // ─── Başlat ───
+        loadData();
+        renderList();
+        setNetStatus('offline', 'Hazır');
+
+    </script>
+</body>
+</html>
